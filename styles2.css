@@ -1,0 +1,127 @@
+/* General Body Styles */
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f9; /* Light background color */
+}
+
+/* Sidebar Styles */
+#sidebar {
+    width: 300px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    z-index: 999;
+}
+
+/* Cesium Container Styles */
+#cesiumContainer {
+    flex-grow: 1;
+    height: 100vh;
+}
+
+/* Control Group Styles */
+.control-group {
+    margin-bottom: 20px;
+}
+
+/* Select and Button Styles */
+select,
+button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px; /* Increased font size for better readability */
+}
+
+/* Button Styles */
+button {
+    background: #2185d0; /* Primary button color */
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1678c2; /* Darker shade on hover */
+}
+
+/* Output Section Styles */
+.output-section {
+    margin-top: 20px;
+}
+
+.output-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333; /* Darker color for titles */
+}
+
+/* Layer Item Styles */
+.layer-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.layer-item label {
+    margin-left: 8px;
+}
+
+/* Status Message Styles */
+.status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    background: #e7f3fe; /* Light blue background for status messages */
+    color: #31708f; /* Dark blue text */
+    display: none; /* Initially hidden */
+}
+
+/* Output Container Styles */
+#outputContainer {
+    background-color: #ffffff; /* White background for output */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Chart Styles */
+canvas {
+    width: 100% !important; /* Ensure canvas takes full width */
+    height: 300px; /* Fixed height for the chart */
+}
+
+/* Layer Control Dropdown Styles */
+#layerControlDropdown {
+    position: absolute; /* Positioning for dropdown */
+    top: 20px;
+    left: 320px; /* Adjust according to sidebar width */
+    z-index: 999;
+}
+
+#layerControlButton {
+    background-color: #2185d0; /* Button color for layers */
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#layerList {
+    display: none; /* Initially hidden */
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    position: absolute;
+    z-index: 999;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}

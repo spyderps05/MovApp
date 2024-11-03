@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Army MOV Application & Cesium Route Viewer</title>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cesium/1.111.0/Widgets/widgets.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cesium/1.111.0/Cesium.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        #cesiumContainer {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .sidebar {
+            transition: transform 0.3s ease;
+            transform: translateX(0); /* Show sidebar by default */
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            max-width: 400px;
+            min-width: 200px;
+            background-color: white;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .outputContainer {
+    transition: transform 0.3s ease;
+    transform: translateX(0); /* Show output container by default */
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    max-width: 400px;
+    min-width: 200px;
+    background-color: white;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    padding: 1rem;
+    overflow-y: auto; /* Add scroll bar to scroll the output container */
+}
+
+        .collapsible {
+            cursor: pointer;
+            padding: 10px;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            transition: background-color 0.3s ease;
+            border: none;
+            background-color: #f1f1f1;
+            width: 100%;
+            border-radius: 5px;
+        }
+
+        .collapsible:hover {
+            background-color: #e2e2e2;
+        }
+
+        .content {
+            padding: 0 18px;
+            display: none;
+            overflow: hidden;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .output-title {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+    </style>
+
+    <script>
+        const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwODAyN2RhMC00NDJhLTRlYTAtOTZhZi00MTA5YmY2NzNjOGIiLCJpZCI6NjY4NDksImlhdCI6MTYzMTI2ODYxNn0.8rktHAJjw8BFjLKc8OICV5ogvwbKzUZBUmY-ZTW9WJY';
+        Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
+    </script>
+</head>
+
+<body class="flex flex-col">
+
+    <div id="sidebar" class="sidebar">
+        <h2 class="text-xl font-bold mb-4">Route Controls</h2>
+        <button class="collapsible">Toggle Route Controls <i class="fas fa-chevron-down"></i></button>
+        <div class="content">
+            <div class="mb-4">
+                <label>Select Route :</label>
+                <select id="routeSelect" class="w-full p-2 border border-gray-300 rounded">
+                    <option value="">Select a route...</option>
+                    <option value="route1">Route 1</option>
+                    <option value="route2">Route 2</option>
+                </select>
+            </div>
+            <div class="mb-4 ">
+                <label>Select Vehicle:</label>
+                <select id="vehicleSelect" class="w-full p- 2 border border-gray-300 rounded">
+                    <option value="">Select a vehicle...</option>
+                    <option value="car">Car</option>
+                    <option value="truck">Truck</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label for="startPoint">Start Point:</label>
+                <input type="text" id="startPoint" placeholder="Latitude, Longitude" class="w-full p-2 border border-gray-300 rounded">
+            </div>
+            <div class="mb-4">
+                <label for="endPoint">End Point:</label>
+                <input type="text" id="endPoint" placeholder="Latitude, Longitude" class="w-full p-2 border border-gray-300 rounded">
+            </div>
+            <div class="mb-4">
+                <label for="numVehicles">Number of Vehicles:</label>
+                <input type="number" id="numVehicles" class="w-full p-2 border border-gray-300 rounded">
+            </div>
+            <div class="mb-4">
+                <label for="vehicleType">Vehicle Type:</label>
+                <select id="vehicleType" class="w-full p-2 border border-gray-300 rounded">
+                    <option value="tank">Tank</option>
+                    <option value="APC">APC</option>
+                    <option value="jeep">Jeep</option>
+                </select>
+            </div>
+            <button id="calculateBtn" class="bg-blue-500 text-white p-2 rounded">Calculate</button>
+            <button id="startButton" disabled class="bg-gray-300 text-white p-2 rounded mt-2">Start Animation</button>
+            <div id="status" class="status"></div>
+        </div>
+    </div>
+
+    <div id="cesiumContainer" class="w-full p-4"></div>
+
+    <div id="outputContainer" class="outputContainer">
+        <h2 class="text-xl font-bold mb-4">Output Overview</h2>
+        <button class="collapsible">Toggle Output Overview <i class="fas fa-chevron-down"></i></button>
+        <div class="content">
+            <div class="output-section mb-4">
+                <div class="output-title">MOV Table</div>
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr>
+                            <th>Packet Type</th>
+                            <th>Number of Vehicles</th>
+                            <th>Average Speed (km/h)</th>
+                            <th>Emission Level (g/km)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Light Packet</td>
+                            <td>20</td>
+                            <td>60</td>
+                            <td>120</td>
+                        </tr>
+                        <tr>
+                            <td>Light Packet</td>
+                            <td>10</td>
+                            <td>65</td>
+                            <td>115</td>
+                        </tr>
+                        <tr>
+                            <td>Mixed Packet</td>
+                            <td>40</td>
+                            <td>50</td>
+                            <td>150</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">Time Distribution</div>
+                <canvas id="timeDistributionChart" class="w-full"></canvas>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">Route Information</div>
+                <p><strong>Best Route:</strong> Route A</p>
+                <p><strong>Distance:</strong> 15 km</p>
+                <p><strong>Estimated Time:</strong> 25 minutes</p>
+                <p><strong>Terrain Difficulty:</strong> Moderate</p>
+                <p><strong>Traffic Conditions:</strong> Light</p>
+                <p><strong>Weather Conditions:</strong> Clear</p>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">AI-based Analysis</div>
+                <p id="aiAnalysis">Based on current parameters, the best route is shown.</p>
+                <button id="generateReportBtn" class="bg-blue-500 text-white p-2 rounded">Generate Full Report</button>
+                <button id="viewDetailsBtn" class="bg-blue-500 text-white p-2 rounded">View Detailed Analysis</button>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">Terrain Analysis</div>
+                <p><strong>Terrain Type:</strong> Mountainous</p>
+                <p><strong>Elevation Gain :</strong> 500m</p>
+                <p><strong>Obstacles:</strong> 3</p>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">Weather Forecast</div>
+                <p><strong>Weather Condition:</strong> Clear</p>
+                <p><strong>Temperature:</strong> 20°C</p>
+                <p><strong>Humidity:</strong> 60%</p>
+            </div>
+
+            <div class="output-section mb-4">
+                <div class="output-title">Traffic Conditions</div>
+                <p><strong>Traffic Volume:</strong> Low</p>
+                <p><strong>Road Conditions:</strong> Good</p>
+                <p><strong>Construction:</strong> None</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add event listeners for collapsible elements
+        const collapsibles = document.querySelectorAll('.collapsible');
+        collapsibles.forEach((collapsible) => {
+            collapsible.addEventListener('click', function () {
+                this.classList.toggle('active');
+                const content = this.nextElementSibling;
+                if (content.style.display === 'block') {
+                    content.style.display = 'none';
+                } else {
+                    content.style.display = 'block';
+                }
+            });
+        });
+
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrainProvider: Cesium.Terrain.fromWorldTerrain(),
+            animation: true,
+            timeline: true,
+            terrain: Cesium.Terrain.fromWorldTerrain({
+                requestVertexNormals: true,
+                ionToken: CESIUM_TOKEN
+            })
+        });
+
+        let currentEntity = null;
+        let currentRoute = null;
+        let boundaryEntity = null;
+
+        async function loadBoundaryPolygon() {
+            const response = await fetch('/routes/sialkot_bounds.geojson');
+            const geojsonData = await response.json();
+            if (geojsonData.features[0].geometry.type === 'MultiPolygon') {
+                const coordinates = geojsonData.features[0].geometry.coordinates[0][0];
+
+                boundaryEntity = viewer.entities.add({
+                    name: 'Boundary',
+                    polygon: {
+                        hierarchy: new Cesium.PolygonHierarchy(
+                            Cesium.Cartesian3.fromDegreesArray(coordinates.flat())
+                        ),
+                        material: Cesium.Color.YELLOW.withAlpha(0.3),
+                        outline: true,
+                        outlineColor: Cesium.Color.BLACK
+                    }
+                });
+
+                addLayerControl("Boundary", boundaryEntity);
+            }
+        }
+
+        async function loadRoute(routeId) {
+            const response = await fetch(`/routes/${routeId}.geojson`);
+            const geojson = await response.json();
+            return geojson.features[0].geometry.coordinates;
+        }
+
+        async function startAnimation(routeId) {
+            try {
+                const routePoints = await loadRoute(routeId);
+                if (!routePoints) return;
+
+                // Clear existing entities
+                if (currentEntity) viewer.entities.remove(currentEntity);
+                if (currentRoute) viewer.entities.remove(currentRoute);
+
+                // Set up route visualization
+                currentRoute = viewer.entities.add({
+                    polyline: {
+                        positions: Cesium.Cartesian3.fromDegreesArray(routePoints.flat()),
+                        width: 5,
+                        material: new Cesium.PolylineGlowMaterialProperty({
+                            glowPower: 0.9,
+                            color: Cesium.Color.RED.withAlpha(0.8)
+                        }),
+                        clampToGround: true
+                    }
+                });
+                addLayerControl("Route", currentRoute);
+
+                const timeStepInSeconds = 10;
+                const totalSeconds = timeStepInSeconds * (routePoints.length - 1);
+                const start = Cesium.JulianDate.fromIso8601("2020-03-09T23:10:00Z");
+                const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
+
+                viewer.clock.startTime = start.clone();
+                viewer.clock.stopTime = stop.clone();
+                viewer.clock.currentTime = start.clone();
+                viewer.timeline.zoomTo(start, stop);
+                viewer.clock.multiplier = 2;
+                viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+
+                const positionProperty = new Cesium.SampledPositionProperty();
+                routePoints.forEach((point, i) => {
+                    const time = Cesium.JulianDate.addSeconds(start, i * timeStepInSeconds, new Cesium.JulianDate());
+                    const position = Cesium.Cartesian3.fromDegrees(point[0], point[1], 0);
+                    positionProperty.addSample(time, position);
+                });
+
+                currentEntity = viewer.entities.add({
+                    availability: new Cesium.TimeIntervalCollection([
+                        new Cesium.TimeInterval({ start: start, stop: stop })
+                    ]),
+                    position: positionProperty,
+                    model: {
+                        uri: await Cesium.IonResource.fromAssetId(2795834),
+                        minimumPixelSize: 64,
+                        maximumScale: 20000,
+                        scale: 0.3,
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    },
+                    orientation: new Cesium.VelocityOrientationProperty(positionProperty)
+                });
+                addLayerControl("Vehicle", currentEntity);
+
+                viewer.trackedEntity = currentEntity;
+                viewer.clock.shouldAnimate = true;
+
+                viewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(routePoints[0][0], routePoints[0][1], 8000),
+                    orientation: {
+                        heading: Cesium.Math.toRadians(0.0),
+                        pitch: Cesium.Math.toRadians(-90),
+                        roll: 0.0
+                    },
+                    duration: 3
+                });
+
+                viewer.clock.onTick.addEventListener(function (clock) {
+                    if (Cesium.JulianDate.equals(clock.currentTime, stop)) {
+                        viewer.entities.remove(currentEntity);
+                        viewer.entities.remove(currentRoute);
+                        viewer.trackedEntity = null;
+                        removeLayerControl("Vehicle");
+                        removeLayerControl("Route");
+                    }
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function addLayerControl(name, entity) {
+            const layerList = document.getElementById('layerList');
+            const layerItem = document.createElement('div');
+            layerItem.classList.add('layer-item');
+            layerItem.innerHTML = `
+                <input type="checkbox" id="toggle-${name}" checked>
+                <label for="toggle-${name}">${name}</label>
+            `;
+            layerList.appendChild(layerItem);
+
+            document.getElementById(`toggle-${name}`).addEventListener('change', function () {
+                entity.show = this.checked;
+            });
+        }
+
+        function removeLayerControl(name) {
+            const layerItem = document.getElementById(`toggle-${name}`);
+            if (layerItem) layerItem.parentElement.remove();
+        }
+
+        document.getElementById('routeSelect').addEventListener('change', updateStartButton);
+        document.getElementById('vehicleSelect').addEventListener('change', updateStartButton);
+        document.getElementById('startButton').addEventListener('click', function () {
+            const selectedRoute = document.getElementById('routeSelect').value;
+            startAnimation(selectedRoute);
+        });
+
+        function updateStartButton() {
+            const routeSelected = document.getElementById('routeSelect').value !== '';
+            const vehicleSelected = document.getElementById('vehicleSelect').value !== '';
+            document.getElementById('startButton').disabled = !(routeSelected && vehicleSelected);
+        }
+
+        async function initialize() {
+            await loadBoundaryPolygon();
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(74.536110, 32.497223, 90000)
+            });
+        }
+
+        initialize();
+
+        // Toggle dropdown visibility
+        document.getElementById('layerControlButton').addEventListener('click', () => {
+            const layerList = document.getElementById('layerList');
+            layerList.style.display = layerList.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Hide dropdown when clicking outside
+        window.addEventListener('click', function (e) {
+            const layerControl = document.getElementById('layerControlDropdown');
+            if (!layerControl.contains(e.target)) {
+                document.getElementById('layerList').style.display = 'none';
+            }
+        });
+
+        // Initialize chart
+        const ctx = document.getElementById('timeDistributionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00'],
+                datasets: [{
+                    label: 'Time Distribution',
+                    data: [10, 20, 30, 40, 50, 60],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.2)',
+                        'rgba(54, 162, 235, 0.2)',
+                        'rgba(255, 206, 86, 0.2)',
+                        'rgba(75, 192, 192, 0.2)',
+                        'rgba(153, 102, 255, 0.2)',
+                        'rgba(255, 159, 64, 0.2)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Add event listeners for buttons
+        document.getElementById('calculateBtn').addEventListener('click', calculateRoute);
+        document.getElementById('startButton').addEventListener('click', startAnimation);
+
+        // Initialize route calculation function
+        async function calculateRoute() {
+            // Fetch values from input fields
+            const startPoint = document.getElementById('startPoint').value;
+            const endPoint = document.getElementById('endPoint').value;
+            const numVehicles = document.getElementById('numVehicles').value;
+            const vehicleType = document.getElementById('vehicleType').value;
+
+            // Placeholder: Display results in output sections
+            document.getElementById('movTable').innerHTML = `Vehicle: ${vehicleType}, Speed: 50 km/h, Distance: 100 km`;
+            document.getElementById('routeDistance').textContent = `Distance: 100 km`;
+            document.getElementById('estimatedTime').textContent = `Estimated Time: 3.5 hours`;
+            document.getElementById('aiAnalysis').textContent = `Route A recommended due to optimal terrain conditions.`;
+        }
+
+        // Initialize animation function
+        async function startAnimation() {
+            // Load route data
+            const routePoints = await loadRoute('route1');
+            if (!routePoints) return;
+
+            // Set up route visualization
+            const routeEntity = viewer.entities.add({
+                polyline: {
+                    positions: Cesium.Cartesian3.fromDegreesArray(routePoints.flat()),
+                    width: 5,
+                    material: new Cesium.PolylineGlowMaterialProperty({
+                        glowPower: 0.9,
+                        color: Cesium.Color.RED.withAlpha(0.8)
+                    }),
+                    clampToGround: true
+                }
+            });
+
+            // Set up animation
+            const timeStepInSeconds = 10;
+            const totalSeconds = timeStepInSeconds * (routePoints.length - 1);
+            const start = Cesium.JulianDate.fromIso8601("2020-03-09T23:10:00Z");
+            const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
+
+            viewer.clock.startTime = start.clone();
+            viewer.clock.stopTime = stop.clone();
+            viewer.clock.currentTime = start.clone();
+            viewer.timeline.zoomTo(start, stop);
+            viewer.clock.multiplier = 2;
+            viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+
+            const positionProperty = new Cesium.SampledPositionProperty();
+            routePoints.forEach((point, i) => {
+                const time = Cesium.JulianDate.addSeconds(start, i * timeStepInSeconds, new Cesium.JulianDate());
+                const position = Cesium.Cartesian3.fromDegrees(point[0], point[1], 0);
+                positionProperty.addSample(time, position);
+            });
+
+            const entity = viewer.entities.add({
+                availability: new Cesium.TimeIntervalCollection([
+                    new Cesium.TimeInterval({ start: start, stop: stop })
+                ]),
+                position: positionProperty,
+                model: {
+                    uri: await Cesium.IonResource.fromAssetId(2795834),
+                    minimumPixelSize: 64,
+                    maximumScale: 20000,
+                    scale: 0.3,
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                },
+                orientation: new Cesium.VelocityOrientationProperty(positionProperty)
+            });
+
+            viewer.trackedEntity = entity;
+            viewer.clock.shouldAnimate = true;
+
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(routePoints[0][0], routePoints[0][1], 8000),
+                orientation: {
+                    heading: Cesium.Math.toRadians(0.0),
+                    pitch: Cesium.Math.toRadians(-90),
+                    roll: 0.0
+                },
+                duration: 3
+            });
+
+            viewer.clock.onTick.addEventListener(function (clock) {
+                if (Cesium.JulianDate.equals(clock.currentTime, stop)) {
+                    viewer.entities.remove(entity);
+                    viewer.entities.remove(routeEntity);
+                    viewer.trackedEntity = null;
+                }
+            });
+        }
+
+        // Load route data
+        async function loadRoute(routeId) {
+            const response = await fetch(`/routes/${routeId}.geojson`);
+            const geojson = await response.json();
+            return geojson.features[0].geometry.coordinates;
+        }
+    </script>
+</body>
+
+</html>
